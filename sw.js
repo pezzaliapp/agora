@@ -1,5 +1,5 @@
 /* Agorà — Service Worker */
-const CACHE = "agora-v3";
+const CACHE = "agora-v4";
 const SHELL = [
   "./",
   "./index.html",

@@ -254,7 +254,7 @@ async function useMyLocation() {
   }, () => {
     setRefreshing(false);
     alert("Posizione non concessa. Scrivi una località nella ricerca.");
-  }, { timeout: 10000 });
+  }, { enableHighAccuracy: true, timeout: 20000, maximumAge: 600000 });
 }
 
 // ── Utilità ────────────────────────────────────────────────────
