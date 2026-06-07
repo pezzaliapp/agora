@@ -24,7 +24,7 @@ const TOPIC = {
 const LOCALE = {
   it:    { hl: "it",    gl: "IT", ceid: "IT:it" },
   both:  { hl: "it",    gl: "IT", ceid: "IT:it" },
-  world: { hl: "en-US", gl: "US", ceid: "US:en" },
+  world: { hl: "it", gl: "IT", ceid: "IT:it" },
 };
 
 // Proxy CORS gratuiti (provati in ordine, con fallback)
