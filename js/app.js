@@ -52,8 +52,21 @@ function feedUrl() {
   }
   const loc = LOCALE[state.region];
   let topic;
+  // "Mondo" usa una ricerca internazionale (il topic WORLD viene bloccato dal proxy)
+  if (state.region === "world") {
+    const terms = {
+      "Attualità": "world news",
+      "Economia": "world economy business",
+      "Tecnologia": "technology",
+      "Sport": "sports",
+      "Scienza": "science",
+      "Cultura": "culture arts",
+    };
+    const q = encodeURIComponent(terms[state.category] || "world news");
+    return `https://news.google.com/rss/search?q=${q}&hl=en-US&gl=US&ceid=US:en`;
+  }
   if (state.category === "Attualità") {
-    topic = state.region === "it" ? "NATION" : state.region === "world" ? "WORLD" : null;
+    topic = state.region === "it" ? "NATION" : null;
   } else {
     topic = TOPIC[state.category];
   }
