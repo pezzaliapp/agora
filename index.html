@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Agorà — Notizie indipendenti</title>
+  <meta name="description" content="Aggregatore di notizie indipendente: titoli da molte testate diverse, link agli articoli originali. Senza pubblicità." />
+
+  <!-- PWA -->
+  <link rel="manifest" href="manifest.webmanifest" />
+  <meta name="theme-color" content="#B03A2E" />
+  <link rel="icon" href="icons/favicon.png" type="image/png" />
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Agorà" />
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,900&family=Spectral:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <div id="app">
+    <!-- MASTHEAD -->
+    <header class="masthead">
+      <div class="kicker">edizione indipendente</div>
+      <h1 class="logo">Agorà</h1>
+      <div class="tagline">notizie da molte voci · senza pubblicità</div>
+    </header>
+
+    <!-- CONTROLS -->
+    <section class="controls">
+      <div class="region" id="region"></div>
+      <div class="chips" id="chips"></div>
+      <div class="localbar">
+        <div class="search">
+          <svg viewBox="0 0 24 24" class="ic"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+          <input id="locality" type="text" placeholder="Notizie locali: città o zona…" autocomplete="off" />
+        </div>
+        <button class="geo" id="geoBtn" title="Usa la mia posizione" aria-label="Usa la mia posizione">
+          <svg viewBox="0 0 24 24" class="ic"><path d="M21 10c0 7-9 12-9 12s-9-5-9-12a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+        </button>
+      </div>
+
+      <div class="statusline">
+        <div class="context" id="context"></div>
+        <button class="refresh" id="refreshBtn">
+          <svg viewBox="0 0 24 24" class="ic"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+          <span id="refreshLabel">aggiorna</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- CONTENT -->
+    <main id="feed"></main>
+
+    <div class="updated" id="updated"></div>
+
+    <footer class="footer">
+      Agorà non scrive notizie proprie: raccoglie titoli da molte testate
+      diverse e rimanda sempre all'articolo originale. Nessuna pubblicità,
+      nessun pagamento — l'equilibrio nasce dalla pluralità delle voci.
+      <div class="offline-note" id="offlineNote"></div>
+    </footer>
+  </div>
+
+  <script src="js/app.js"></script>
+</body>
+</html>
