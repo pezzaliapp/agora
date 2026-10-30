@@ -34,25 +34,24 @@ intero.
 > Nota: i percorsi sono tutti **relativi**, quindi funziona anche sotto la
 > sotto-cartella `/Agora/` tipica di GitHub Pages.
 
-## Come funzionano i dati (e i limiti onesti)
+## Come funzionano i dati
 
 - Le notizie arrivano dai feed RSS di **Google News**, che aggregano molte
   testate diverse e linkano sempre all'originale.
-- Poiché un sito statico non può leggere direttamente quei feed (limiti CORS
-  del browser), Agorà passa per un **proxy CORS pubblico gratuito**
-  (allorigins / codetabs / corsproxy, con fallback automatico).
-- La geolocalizzazione usa il reverse-geocoding gratuito e senza chiave di
-  **BigDataCloud** solo per ricavare il nome della città.
+- Un workflow **GitHub Actions** gratuito (`.github/workflows/update-news.yml`)
+  scarica i feed **ogni 20 minuti** e li salva in `data/*.json`. L'app li legge
+  dal proprio sito: niente proxy, niente problemi CORS.
+- Se un feed non risponde, resta l'ultima versione buona; se la rete manca,
+  l'app mostra le ultime notizie salvate sul dispositivo.
+- Solo la **ricerca locale** (città/zona) usa ancora i proxy CORS in tempo
+  reale, con timeout e fallback automatico.
+- La geolocalizzazione usa il reverse-geocoding gratuito di **BigDataCloud**.
 
-Tutto questo è **gratuito e senza pubblicità**, ma i proxy pubblici possono
-ogni tanto essere lenti o occupati: in quel caso basta toccare **Aggiorna**.
+Tutto resta **a costo zero**: GitHub Actions è gratuito per le repo pubbliche.
 
-### Vuoi massima affidabilità e indipendenza totale?
-
-Il punto più fragile è il proxy pubblico. Se in futuro vuoi non dipendere da
-terzi, puoi mettere un mini-proxy tuo (poche righe) su un servizio gratuito
-(es. una Cloudflare Worker) e sostituire l'elenco `PROXIES` in `js/app.js` con
-il tuo indirizzo. La app resta identica.
+> Nota: GitHub sospende i workflow programmati se la repo non ha attività per
+> 60 giorni e manda un'email di avviso: in quel caso basta riattivarlo da
+> **Actions → Aggiorna notizie → Enable workflow**.
 
 ## Struttura
 
@@ -63,6 +62,9 @@ il tuo indirizzo. La app resta identica.
 ├── sw.js
 ├── css/styles.css
 ├── js/app.js
+├── data/           (notizie generate automaticamente)
+├── scripts/fetch-news.mjs
+├── .github/workflows/update-news.yml
 └── icons/  (192, 512, maskable, apple-touch, favicon)
 ```
 

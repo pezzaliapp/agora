@@ -76,12 +76,47 @@ function feedUrl() {
   return `${base}?hl=${loc.hl}&gl=${loc.gl}&ceid=${loc.ceid}`;
 }
 
-// ── Fetch con fallback fra proxy ───────────────────────────────
+// ── Notizie pre-scaricate da GitHub Actions (data/*.json) ──────
+// Un workflow gratuito scarica i feed ogni 20 minuti e li salva nella repo:
+// l'app li legge dal proprio sito, senza proxy e senza problemi CORS.
+const RAW_DATA = "https://raw.githubusercontent.com/pezzaliapp/agora/main/data/";
+
+function dataSlug(region, category) {
+  const c = category.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+  return `${region}-${c}`;
+}
+
+function fetchWithTimeout(url, ms) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), ms);
+  return fetch(url, { cache: "no-store", signal: ctrl.signal }).finally(() => clearTimeout(t));
+}
+
+async function fetchPrebuilt() {
+  const name = dataSlug(state.region, state.category) + ".json";
+  // 1) stesso sito (GitHub Pages)  2) raw.githubusercontent (aggiornato anche se Pages è in ritardo)
+  let best = null;
+  for (const base of ["data/", RAW_DATA]) {
+    try {
+      const res = await fetchWithTimeout(base + name + "?t=" + Date.now(), 6000);
+      if (!res.ok) continue;
+      const j = await res.json();
+      if (!j.articles?.length) continue;
+      if (!best || j.updated > best.updated) best = j;
+      // se è recente (< 45 min) non serve cercare altrove
+      if (Date.now() - new Date(j.updated) < 45 * 60e3) break;
+    } catch {}
+  }
+  if (!best) throw new Error("dati non disponibili");
+  return best;
+}
+
+// ── Fetch live con fallback fra proxy (ricerca locale / riserva) ─
 async function fetchFeed(url) {
   let lastErr;
   for (const wrap of PROXIES) {
     try {
-      const res = await fetch(wrap(url), { cache: "no-store" });
+      const res = await fetchWithTimeout(wrap(url), 8000);
       if (!res.ok) throw new Error("HTTP " + res.status);
       const text = await res.text();
       if (text && text.includes("<item")) return text;
@@ -91,6 +126,29 @@ async function fetchFeed(url) {
     }
   }
   throw lastErr || new Error("tutti i proxy hanno fallito");
+}
+
+// ── Ultimo risultato buono (per non mostrare mai una pagina vuota) ─
+function cacheKey() {
+  return "agora:" + (state.local ? "local:" + state.local.locality.toLowerCase() : dataSlug(state.region, state.category));
+}
+function saveLast(list, updated) {
+  try { localStorage.setItem(cacheKey(), JSON.stringify({ list, updated })); } catch {}
+}
+function loadLast() {
+  try { return JSON.parse(localStorage.getItem(cacheKey())); } catch { return null; }
+}
+
+async function getArticles() {
+  if (!state.local) {
+    try {
+      const j = await fetchPrebuilt();
+      return { list: j.articles.slice(0, 12), updated: j.updated };
+    } catch {}
+  }
+  const list = parseFeed(await fetchFeed(feedUrl()));
+  if (!list.length) throw new Error("nessun risultato");
+  return { list, updated: new Date().toISOString() };
 }
 
 // ── Parsing RSS Google News ────────────────────────────────────
@@ -207,27 +265,42 @@ function renderError() {
 }
 
 // ── Caricamento ────────────────────────────────────────────────
+let lastLoad = 0;
 async function load() {
+  lastLoad = Date.now();
   const id = ++state.reqId;
   state.loading = true;
   renderControls();
   setRefreshing(true);
   skeletons();
   try {
-    const xml = await fetchFeed(feedUrl());
+    const { list, updated } = await getArticles();
     if (id !== state.reqId) return;
-    const list = parseFeed(xml);
-    if (!list.length) throw new Error("nessun risultato");
     renderArticles(list);
-    $("updated").textContent = "aggiornato alle " +
-      new Date().toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" });
+    saveLast(list, updated);
+    $("updated").textContent = "notizie aggiornate " + updatedLabel(updated);
   } catch (e) {
     if (id !== state.reqId) return;
-    renderError();
-    $("updated").textContent = "";
+    const last = loadLast();
+    if (last?.list?.length) {
+      renderArticles(last.list);
+      $("updated").textContent = "fonte non raggiungibile — mostro le notizie salvate " + updatedLabel(last.updated);
+    } else {
+      renderError();
+      $("updated").textContent = "";
+    }
   } finally {
     if (id === state.reqId) { state.loading = false; setRefreshing(false); }
   }
+}
+
+function updatedLabel(iso) {
+  const d = new Date(iso);
+  if (isNaN(d)) return "";
+  const t = d.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" });
+  return d.toDateString() === new Date().toDateString()
+    ? "alle " + t
+    : "del " + d.toLocaleDateString("it-IT", { day: "numeric", month: "short" }) + " alle " + t;
 }
 
 function setRefreshing(on) {
@@ -283,6 +356,14 @@ $("refreshBtn").addEventListener("click", () => { if (!state.loading) load(); })
 
 renderControls();
 load();
+
+// Ricarica da sola quando riapri l'app (PWA in background) o ogni 15 minuti se resta aperta
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible" && !state.loading && Date.now() - lastLoad > 5 * 60e3) load();
+});
+setInterval(() => {
+  if (document.visibilityState === "visible" && !state.loading) load();
+}, 15 * 60e3);
 
 // ── Service worker ─────────────────────────────────────────────
 if ("serviceWorker" in navigator) {

@@ -1,5 +1,5 @@
 /* Agorà — Service Worker */
-const CACHE = "agora-v6";
+const CACHE = "agora-v7";
 const SHELL = [
   "./",
   "./index.html",
@@ -32,18 +32,23 @@ self.addEventListener("fetch", (e) => {
   if (req.method !== "GET") return;
   const url = new URL(req.url);
 
-  // Richieste alle notizie (proxy/news/geocoding): sempre dalla rete, mai cache
+  // Richieste esterne (proxy, raw.githubusercontent, geocoding): sempre dalla rete
   if (url.origin !== location.origin) return;
 
-  // App shell same-origin: cache-first con aggiornamento in background
+  // Notizie pre-scaricate: sempre dalla rete (l'app ha già il suo salvataggio locale)
+  if (url.pathname.includes("/data/")) return;
+
+  // App shell: prima la rete (così ogni modifica pubblicata arriva subito),
+  // la cache serve solo quando sei offline
   e.respondWith(
-    caches.match(req).then((cached) => {
-      const fromNet = fetch(req).then((res) => {
-        const copy = res.clone();
-        caches.open(CACHE).then((c) => c.put(req, copy)).catch(() => {});
+    fetch(req)
+      .then((res) => {
+        if (res.ok) {
+          const copy = res.clone();
+          caches.open(CACHE).then((c) => c.put(req, copy)).catch(() => {});
+        }
         return res;
-      }).catch(() => cached);
-      return cached || fromNet;
-    })
+      })
+      .catch(() => caches.match(req).then((r) => r || caches.match("./index.html")))
   );
 });
