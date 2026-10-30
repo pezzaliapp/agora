@@ -1,8 +1,13 @@
 // Agorà — scarica i feed Google News lato server (GitHub Actions, gratis)
-// e salva un JSON per ogni combinazione regione/categoria in data/.
+// e salva un JSON per ogni combinazione regione/categoria e per ogni località
+// di scripts/cities.txt. Uso: node scripts/fetch-news.mjs <cartella-output>
 // Nessuna dipendenza: richiede solo Node 18+ (fetch nativo).
 
 import { writeFile, mkdir, readFile } from "node:fs/promises";
+
+const OUT = process.argv[2] || "out";
+const LOCAL_MAX = +(process.env.LOCAL_MAX || 80);     // località aggiornate per giro
+const LOCAL_MAX_AGE = 50 * 60e3;                      // aggiorna le località più vecchie di 50 min
 
 const CATEGORIES = ["Attualità", "Economia", "Tecnologia", "Sport", "Scienza", "Cultura"];
 const REGIONS = ["both", "it", "world"];
@@ -40,11 +45,12 @@ function feedUrl(region, category) {
   return `${base}?${IT}`;
 }
 
-// Nome file stabile e senza accenti, uguale a quello usato da js/app.js
-export function slug(region, category) {
-  const c = category.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
-  return `${region}-${c}`;
+// Stessa normalizzazione usata da js/app.js
+function norm(s) {
+  return s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase()
+    .split("/")[0].replace(/[^a-z0-9]+/g, " ").trim();
 }
+const slug = (s) => norm(s).replace(/ /g, "-");
 
 function decode(s) {
   return s
@@ -80,8 +86,11 @@ function parse(xml) {
       url: tag(it, "link"),
       date: isNaN(d) ? "" : d.toISOString(),
     };
-  }).filter((a) => a.url);
+  }).filter((a) => a.url)
+    .sort((a, b) => (b.date || "").localeCompare(a.date || ""));
 }
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 async function get(url, tries = 3) {
   let err;
@@ -100,40 +109,77 @@ async function get(url, tries = 3) {
       return text;
     } catch (e) {
       err = e;
-      await new Promise((r) => setTimeout(r, 2000 * (i + 1)));
+      await sleep(2000 * (i + 1));
     }
   }
   throw err;
 }
 
-await mkdir("data", { recursive: true });
-let ok = 0, fail = 0;
-const cache = new Map(); // stesso URL usato da più combinazioni
+async function readJson(file) {
+  try { return JSON.parse(await readFile(file, "utf8")); } catch { return null; }
+}
 
+async function save(file, articles) {
+  await writeFile(file, JSON.stringify({ updated: new Date().toISOString(), articles }) + "\n");
+}
+
+await mkdir(`${OUT}/local`, { recursive: true });
+let ok = 0, fail = 0;
+
+// ── 1. Categorie (ogni giro) ───────────────────────────────────
+const cache = new Map();
 for (const region of REGIONS) {
   for (const category of CATEGORIES) {
     const url = feedUrl(region, category);
-    const file = `data/${slug(region, category)}.json`;
+    const file = `${OUT}/${region}-${slug(category)}.json`;
     try {
       if (!cache.has(url)) cache.set(url, parse(await get(url)));
       const articles = cache.get(url);
       if (!articles.length) throw new Error("nessun articolo");
-      // scrive solo se i titoli sono cambiati (evita commit inutili)
-      let prev = null;
-      try { prev = JSON.parse(await readFile(file, "utf8")); } catch {}
-      const same = prev && JSON.stringify(prev.articles) === JSON.stringify(articles);
-      if (!same) {
-        await writeFile(file, JSON.stringify({ updated: new Date().toISOString(), articles }) + "\n");
-      }
+      await save(file, articles);
       ok++;
-      console.log(`✓ ${file} (${articles.length})${same ? " invariato" : ""}`);
     } catch (e) {
-      // in caso di errore si tiene il file precedente: l'app mostra le ultime notizie buone
+      // si tiene il file precedente: l'app mostra le ultime notizie buone
       fail++;
       console.warn(`✗ ${file}: ${e.message}`);
     }
   }
 }
+console.log(`Categorie: ${ok} ok, ${fail} errori`);
 
-console.log(`Fatto: ${ok} ok, ${fail} errori`);
-if (ok === 0) process.exit(1);
+// ── 2. Località (a rotazione, le più vecchie prima) ────────────
+const names = (await readFile(new URL("./cities.txt", import.meta.url), "utf8"))
+  .split("\n").map((l) => l.trim()).filter((l) => l && !l.startsWith("#"));
+
+const index = {};
+const ages = [];
+for (const name of names) {
+  const s = slug(name);
+  index[norm(name)] = { slug: s, name };
+  const prev = await readJson(`${OUT}/local/${s}.json`);
+  ages.push({ name, s, updated: prev ? new Date(prev.updated).getTime() : 0 });
+}
+await writeFile(`${OUT}/local/index.json`, JSON.stringify(index) + "\n");
+
+const todo = ages
+  .filter((a) => Date.now() - a.updated > LOCAL_MAX_AGE)
+  .sort((a, b) => a.updated - b.updated)
+  .slice(0, LOCAL_MAX);
+
+let lok = 0, lfail = 0;
+for (const { name, s } of todo) {
+  const url = `https://news.google.com/rss/search?q=${encodeURIComponent(name)}&${IT}`;
+  try {
+    const articles = parse(await get(url, 2));
+    if (!articles.length) throw new Error("nessun articolo");
+    await save(`${OUT}/local/${s}.json`, articles);
+    lok++;
+  } catch (e) {
+    lfail++;
+    console.warn(`✗ local/${s}: ${e.message}`);
+  }
+  await sleep(400); // gentile con Google
+}
+console.log(`Località: ${lok} aggiornate, ${lfail} errori, ${names.length - todo.length} ancora fresche`);
+
+if (ok === 0 && lok === 0) process.exit(1);

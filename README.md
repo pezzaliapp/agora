@@ -39,12 +39,17 @@ intero.
 - Le notizie arrivano dai feed RSS di **Google News**, che aggregano molte
   testate diverse e linkano sempre all'originale.
 - Un workflow **GitHub Actions** gratuito (`.github/workflows/update-news.yml`)
-  scarica i feed **ogni 20 minuti** e li salva in `data/*.json`. L'app li legge
-  dal proprio sito: niente proxy, niente problemi CORS.
-- Se un feed non risponde, resta l'ultima versione buona; se la rete manca,
-  l'app mostra le ultime notizie salvate sul dispositivo.
-- Solo la **ricerca locale** (città/zona) usa ancora i proxy CORS in tempo
-  reale, con timeout e fallback automatico.
+  scarica i feed **ogni 20 minuti** e li pubblica sul ramo **`data`** della
+  repo (sovrascritto ogni volta, quindi la repo non cresce). L'app li legge da
+  `raw.githubusercontent.com`: niente proxy, niente problemi CORS.
+- **Notizie locali**: le località in `scripts/cities.txt` (regioni, capoluoghi
+  e circa 90 altre città) vengono scaricate a rotazione, ognuna circa ogni ora.
+  Per aggiungere una città basta scriverla in quel file.
+- Per un comune non in elenco l'app prova i proxy CORS in tempo reale; se non
+  rispondono mostra le notizie della provincia o della regione (ricavate con
+  OpenStreetMap o dalla geolocalizzazione).
+- Se un feed non risponde resta l'ultima versione buona; senza rete l'app
+  mostra le ultime notizie salvate sul dispositivo.
 - La geolocalizzazione usa il reverse-geocoding gratuito di **BigDataCloud**.
 
 Tutto resta **a costo zero**: GitHub Actions è gratuito per le repo pubbliche.
@@ -62,8 +67,8 @@ Tutto resta **a costo zero**: GitHub Actions è gratuito per le repo pubbliche.
 ├── sw.js
 ├── css/styles.css
 ├── js/app.js
-├── data/           (notizie generate automaticamente)
 ├── scripts/fetch-news.mjs
+├── scripts/cities.txt
 ├── .github/workflows/update-news.yml
 └── icons/  (192, 512, maskable, apple-touch, favicon)
 ```

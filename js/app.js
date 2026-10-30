@@ -76,39 +76,91 @@ function feedUrl() {
   return `${base}?hl=${loc.hl}&gl=${loc.gl}&ceid=${loc.ceid}`;
 }
 
-// ── Notizie pre-scaricate da GitHub Actions (data/*.json) ──────
-// Un workflow gratuito scarica i feed ogni 20 minuti e li salva nella repo:
-// l'app li legge dal proprio sito, senza proxy e senza problemi CORS.
-const RAW_DATA = "https://raw.githubusercontent.com/pezzaliapp/agora/main/data/";
+// ── Notizie pre-scaricate da GitHub Actions ───────────────────
+// Un workflow gratuito scarica i feed ogni 20 minuti e li pubblica sul ramo
+// "data" della repo: l'app li legge da raw.githubusercontent (CORS aperto).
+const DATA = "https://raw.githubusercontent.com/pezzaliapp/agora/data/";
 
-function dataSlug(region, category) {
-  const c = category.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
-  return `${region}-${c}`;
+// Stessa normalizzazione di scripts/fetch-news.mjs
+function norm(s) {
+  return String(s).normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase()
+    .split("/")[0].replace(/[^a-z0-9]+/g, " ").trim();
 }
+const slug = (s) => norm(s).replace(/ /g, "-");
+const dataSlug = (region, category) => `${region}-${slug(category)}`;
 
-function fetchWithTimeout(url, ms) {
+function fetchWithTimeout(url, ms, opts = {}) {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), ms);
-  return fetch(url, { cache: "no-store", signal: ctrl.signal }).finally(() => clearTimeout(t));
+  return fetch(url, { cache: "no-store", ...opts, signal: ctrl.signal }).finally(() => clearTimeout(t));
 }
 
-async function fetchPrebuilt() {
-  const name = dataSlug(state.region, state.category) + ".json";
-  // 1) stesso sito (GitHub Pages)  2) raw.githubusercontent (aggiornato anche se Pages è in ritardo)
-  let best = null;
-  for (const base of ["data/", RAW_DATA]) {
+async function fetchData(path) {
+  const res = await fetchWithTimeout(DATA + path + "?t=" + Math.floor(Date.now() / 60e3), 8000);
+  if (!res.ok) throw new Error("HTTP " + res.status);
+  const j = await res.json();
+  if (!j.articles?.length) throw new Error("vuoto");
+  return j;
+}
+
+// ── Località disponibili ──────────────────────────────────────
+let localIndex = null;
+async function getLocalIndex() {
+  if (!localIndex) {
+    const res = await fetchWithTimeout(DATA + "local/index.json", 8000, { cache: "default" });
+    if (!res.ok) throw new Error("indice non disponibile");
+    localIndex = await res.json();
+  }
+  return localIndex;
+}
+
+function findLocal(index, name) {
+  const q = norm(name);
+  if (!q) return null;
+  if (index[q]) return index[q];
+  // "civitanova" → "civitanova marche", "reggio emilia" → ok, "monza e brianza" → "monza"
+  const keys = Object.keys(index);
+  const k = keys.find((k) => k.startsWith(q + " ")) || keys.find((k) => q.startsWith(k + " "));
+  return k ? index[k] : null;
+}
+
+// Per i comuni non in elenco: provincia e regione con OpenStreetMap (gratis, senza chiave)
+async function geocodeArea(name) {
+  const u = "https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=1&countrycodes=it&accept-language=it&q=" + encodeURIComponent(name);
+  const res = await fetchWithTimeout(u, 8000, { cache: "default" });
+  const j = await res.json();
+  const a = j[0]?.address || {};
+  return [a.county, a.province, a.state].filter(Boolean)
+    .map((s) => s.replace(/^(provincia|città metropolitana|libero consorzio comunale)\s+(di|del|della|dell'|dei)\s*/i, ""));
+}
+
+async function getLocalArticles() {
+  const name = state.local.locality;
+  let index = {};
+  try { index = await getLocalIndex(); } catch {}
+
+  // 1) città in elenco: dati pre-scaricati
+  const hit = findLocal(index, name);
+  if (hit) {
+    try { const j = await fetchData(`local/${hit.slug}.json`); return { list: j.articles.slice(0, 12), updated: j.updated }; } catch {}
+  }
+  // 2) ricerca in tempo reale tramite proxy
+  try {
+    const list = parseFeed(await fetchFeed(feedUrl()));
+    if (list.length) return { list, updated: new Date().toISOString() };
+  } catch {}
+  // 3) riserva: provincia o regione (dalla geolocalizzazione o da OpenStreetMap)
+  let areas = state.local.areas || [];
+  if (!areas.length) { try { areas = await geocodeArea(name); } catch {} }
+  for (const area of areas) {
+    const h = findLocal(index, area);
+    if (!h || h === hit) continue;
     try {
-      const res = await fetchWithTimeout(base + name + "?t=" + Date.now(), 6000);
-      if (!res.ok) continue;
-      const j = await res.json();
-      if (!j.articles?.length) continue;
-      if (!best || j.updated > best.updated) best = j;
-      // se è recente (< 45 min) non serve cercare altrove
-      if (Date.now() - new Date(j.updated) < 45 * 60e3) break;
+      const j = await fetchData(`local/${h.slug}.json`);
+      return { list: j.articles.slice(0, 12), updated: j.updated, note: h.name };
     } catch {}
   }
-  if (!best) throw new Error("dati non disponibili");
-  return best;
+  throw new Error("nessuna fonte");
 }
 
 // ── Fetch live con fallback fra proxy (ricerca locale / riserva) ─
@@ -140,12 +192,11 @@ function loadLast() {
 }
 
 async function getArticles() {
-  if (!state.local) {
-    try {
-      const j = await fetchPrebuilt();
-      return { list: j.articles.slice(0, 12), updated: j.updated };
-    } catch {}
-  }
+  if (state.local) return getLocalArticles();
+  try {
+    const j = await fetchData(dataSlug(state.region, state.category) + ".json");
+    return { list: j.articles.slice(0, 12), updated: j.updated };
+  } catch {}
   const list = parseFeed(await fetchFeed(feedUrl()));
   if (!list.length) throw new Error("nessun risultato");
   return { list, updated: new Date().toISOString() };
@@ -258,7 +309,9 @@ function renderArticles(list) {
 
 function renderError() {
   $("feed").innerHTML = `<div class="errorbox">
-    <p>Non sono riuscito a recuperare le notizie.<br>Il proxy gratuito potrebbe essere momentaneamente occupato.</p>
+    <p>${state.local
+      ? `Non ho trovato notizie per ${escapeHtml(state.local.locality)}.<br>Prova con il capoluogo di provincia o con la regione.`
+      : "Non sono riuscito a recuperare le notizie.<br>Riprova tra qualche minuto."}</p>
     <button id="retryBtn">Riprova</button>
   </div>`;
   $("retryBtn").onclick = load;
@@ -274,11 +327,12 @@ async function load() {
   setRefreshing(true);
   skeletons();
   try {
-    const { list, updated } = await getArticles();
+    const { list, updated, note } = await getArticles();
     if (id !== state.reqId) return;
     renderArticles(list);
     saveLast(list, updated);
-    $("updated").textContent = "notizie aggiornate " + updatedLabel(updated);
+    $("updated").textContent = (note ? `nessuna notizia trovata solo per ${state.local.locality}: mostro la zona di ${note} · ` : "")
+      + "notizie aggiornate " + updatedLabel(updated);
   } catch (e) {
     if (id !== state.reqId) return;
     const last = loadLast();
@@ -331,7 +385,11 @@ async function useMyLocation() {
       const place = j.city || j.locality || j.principalSubdivision;
       if (!place) throw new Error("no place");
       $("locality").value = place;
-      state.local = { locality: place };
+      const areas = (j.localityInfo?.administrative || [])
+        .filter((x) => x.adminLevel === 6 || x.adminLevel === 4)
+        .sort((x, y) => y.adminLevel - x.adminLevel)
+        .map((x) => x.name.replace(/^(provincia|città metropolitana|libero consorzio comunale)\s+(di|del|della|dell'|dei)\s*/i, ""));
+      state.local = { locality: place, areas };
       load();
     } catch {
       setRefreshing(false);

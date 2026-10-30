@@ -15,7 +15,7 @@ concurrency:
 jobs:
   update:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 
@@ -23,18 +23,27 @@ jobs:
         with:
           node-version: 20
 
-      - name: Scarica i feed
-        run: node scripts/fetch-news.mjs
-
-      - name: Pubblica se ci sono novità
+      - name: Recupera i dati precedenti (ramo "data")
         run: |
+          mkdir -p out
+          if git fetch --depth=1 origin data 2>/dev/null; then
+            git archive FETCH_HEAD | tar -x -C out
+          fi
+
+      - name: Scarica i feed
+        env:
+          # a mano: aggiorna tutte le località; in automatico: 80 per giro, a rotazione
+          LOCAL_MAX: ${{ github.event_name == 'workflow_dispatch' && '999' || '80' }}
+        run: node scripts/fetch-news.mjs out
+
+      - name: Pubblica sul ramo "data" (sovrascritto ogni volta, la repo non cresce)
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cd out
+          git init -q -b data
           git config user.name "agora-bot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/
-          if git diff --cached --quiet; then
-            echo "Nessuna novità"
-          else
-            git commit -m "Notizie aggiornate $(date -u +'%Y-%m-%d %H:%M') UTC"
-            git pull --rebase --quiet
-            git push
-          fi
+          git add -A
+          git commit -qm "Notizie $(date -u +'%Y-%m-%d %H:%M') UTC"
+          git push -qf "https://x-access-token:${TOKEN}@github.com/${GITHUB_REPOSITORY}.git" data

@@ -1,0 +1,233 @@
+# Località per le notizie locali pre-scaricate (una per riga).
+# Puoi aggiungere qualsiasi città: verrà scaricata al prossimo aggiornamento.
+
+# Regioni (usate anche come riserva per i comuni non in elenco)
+Abruzzo
+Basilicata
+Calabria
+Campania
+Emilia-Romagna
+Friuli Venezia Giulia
+Lazio
+Liguria
+Lombardia
+Marche
+Molise
+Piemonte
+Puglia
+Sardegna
+Sicilia
+Toscana
+Trentino-Alto Adige
+Umbria
+Valle d'Aosta
+Veneto
+
+# Capoluoghi
+Agrigento
+Alessandria
+Ancona
+Andria
+Aosta
+Arezzo
+Ascoli Piceno
+Asti
+Avellino
+Bari
+Barletta
+Belluno
+Benevento
+Bergamo
+Biella
+Bologna
+Bolzano
+Brescia
+Brindisi
+Cagliari
+Caltanissetta
+Campobasso
+Carbonia
+Carrara
+Caserta
+Catania
+Catanzaro
+Cesena
+Chieti
+Como
+Cosenza
+Cremona
+Crotone
+Cuneo
+Enna
+Fermo
+Ferrara
+Firenze
+Foggia
+Forlì
+Frosinone
+Genova
+Gorizia
+Grosseto
+Imperia
+Isernia
+L'Aquila
+La Spezia
+Latina
+Lecce
+Lecco
+Livorno
+Lodi
+Lucca
+Macerata
+Mantova
+Massa
+Matera
+Messina
+Milano
+Modena
+Monza
+Napoli
+Novara
+Nuoro
+Olbia
+Oristano
+Padova
+Palermo
+Parma
+Pavia
+Perugia
+Pesaro
+Pescara
+Piacenza
+Pisa
+Pistoia
+Pordenone
+Potenza
+Prato
+Ragusa
+Ravenna
+Reggio Calabria
+Reggio Emilia
+Rieti
+Rimini
+Roma
+Rovigo
+Salerno
+Sanluri
+Sassari
+Savona
+Siena
+Siracusa
+Sondrio
+Taranto
+Tempio Pausania
+Teramo
+Terni
+Torino
+Trani
+Trapani
+Trento
+Treviso
+Trieste
+Udine
+Urbino
+Varese
+Venezia
+Verbania
+Vercelli
+Verona
+Vibo Valentia
+Vicenza
+Viterbo
+
+# Altre città
+Acireale
+Afragola
+Alghero
+Altamura
+Anzio
+Aprilia
+Avezzano
+Bagheria
+Bassano del Grappa
+Battipaglia
+Bisceglie
+Bitonto
+Bressanone
+Busto Arsizio
+Carpi
+Castellammare di Stabia
+Casoria
+Cattolica
+Cava de' Tirreni
+Cerignola
+Cesenatico
+Chioggia
+Cinisello Balsamo
+Città di Castello
+Civitanova Marche
+Civitavecchia
+Collegno
+Corigliano-Rossano
+Desio
+Eboli
+Empoli
+Ercolano
+Fabriano
+Faenza
+Fano
+Fiumicino
+Foligno
+Gallarate
+Gela
+Giugliano in Campania
+Guidonia Montecelio
+Imola
+Jesi
+Lamezia Terme
+Lanciano
+Legnano
+Manfredonia
+Marsala
+Mazara del Vallo
+Merano
+Modica
+Molfetta
+Moncalieri
+Monfalcone
+Montesilvano
+Nichelino
+Nocera Inferiore
+Osimo
+Pomezia
+Portici
+Porto San Giorgio
+Pozzuoli
+Quartu Sant'Elena
+Recanati
+Riccione
+Rivoli
+Rovereto
+San Benedetto del Tronto
+San Donà di Piave
+San Severo
+Sanremo
+Sassuolo
+Scafati
+Scandicci
+Schio
+Senigallia
+Sesto Fiorentino
+Sesto San Giovanni
+Settimo Torinese
+Spoleto
+Sulmona
+Termoli
+Tivoli
+Tolentino
+Torre del Greco
+Vasto
+Velletri
+Viareggio
+Vigevano
+Vittoria
